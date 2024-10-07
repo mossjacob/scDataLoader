@@ -128,6 +128,14 @@ class DataModule(L.LightningDataModule):
                     prev_chromosome = r["chromosome_name"]
                 print(f"reduced the size to {len(set(c))/len(biomart)}")
                 biomart["pos"] = c
+
+            # Drop genes that are not in the biomart table
+            biomart_genes = set(biomart.index)
+            dataset_genes = set(mdataset.genedf.index)
+            if len(dataset_genes - biomart_genes) > 0:
+                print(f"... dropping {len(dataset_genes - biomart_genes)} genes not in biomart")
+                mdataset.genedf = mdataset.genedf.loc[list(dataset_genes.intersection(biomart_genes))]
+
             mdataset.genedf = biomart.loc[mdataset.genedf.index]
             self.gene_pos = mdataset.genedf["pos"].astype(int).tolist()
 
