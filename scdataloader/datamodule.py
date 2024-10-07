@@ -274,7 +274,7 @@ class DataModule(L.LightningDataModule):
         ), "test set + valid set size is configured to be larger than entire dataset."
 
         idx_full = []
-        if len(self.assays_to_drop) > 0:
+        if len(self.assays_to_drop) > 0 and "assay_ontology_term_id" in self.dataset.obs:
             for i, a in enumerate(
                 self.dataset.mapped_dataset.get_merged_labels("assay_ontology_term_id")
             ):
@@ -282,6 +282,9 @@ class DataModule(L.LightningDataModule):
                     idx_full.append(i)
             idx_full = np.array(idx_full)
         else:
+            if "assay_ontology_term_id" not in self.dataset.obs:
+                print("WARNING: Assay does not have ontology term, cannot check for assays to drop")
+
             idx_full = np.arange(self.n_samples)
         if len_test > 0:
             # this way we work on some never seen datasets
