@@ -26,7 +26,6 @@ dependencies = [
     "decoupler>=1.2.0",
     "django>=4.0.0",
     "scikit-misc>=0.1.4",
-    "scdataloader",
     "pip>=24.2",
 ]
 
