@@ -176,54 +176,31 @@ def validate(adata: AnnData, organism: str):
         raise ValueError("Duplicate gene names found in adata.var.index")
     if adata.obs.index.duplicated().any():
         raise ValueError("Duplicate cell names found in adata.obs.index")
-    for val in [
-        "self_reported_ethnicity_ontology_term_id",
-        "organism_ontology_term_id",
-        "disease_ontology_term_id",
-        "cell_type_ontology_term_id",
-        "development_stage_ontology_term_id",
-        "tissue_ontology_term_id",
-        "assay_ontology_term_id",
-    ]:
-        if val not in adata.obs.columns:
-            raise ValueError(
-                f"Column '{val}' is missing in the provided anndata object."
-            )
 
-    if not bt.Ethnicity.validate(
-        adata.obs["self_reported_ethnicity_ontology_term_id"],
-        field="ontology_id",
-    ).all():
-        raise ValueError("Invalid ethnicity ontology term id found")
-    if not bt.Organism.validate(
-        adata.obs["organism_ontology_term_id"], field="ontology_id"
-    ).all():
-        raise ValueError("Invalid organism ontology term id found")
-    if not bt.Phenotype.validate(
-        adata.obs["sex_ontology_term_id"], field="ontology_id"
-    ).all():
-        raise ValueError("Invalid sex ontology term id found")
-    if not bt.Disease.validate(
-        adata.obs["disease_ontology_term_id"], field="ontology_id"
-    ).all():
-        raise ValueError("Invalid disease ontology term id found")
-    if not bt.CellType.validate(
-        adata.obs["cell_type_ontology_term_id"], field="ontology_id"
-    ).all():
-        raise ValueError("Invalid cell type ontology term id found")
-    if not bt.DevelopmentalStage.validate(
-        adata.obs["development_stage_ontology_term_id"],
-        field="ontology_id",
-    ).all():
-        raise ValueError("Invalid dev stage ontology term id found")
-    if not bt.Tissue.validate(
-        adata.obs["tissue_ontology_term_id"], field="ontology_id"
-    ).all():
-        raise ValueError("Invalid tissue ontology term id found")
-    if not bt.ExperimentalFactor.validate(
-        adata.obs["assay_ontology_term_id"], field="ontology_id"
-    ).all():
-        raise ValueError("Invalid assay ontology term id found")
+    validators = {
+        bt.Ethnicity: dict(obs="self_reported_ethnicity_ontology_term_id", required=False),
+        bt.Organism: dict(obs="organism_ontology_term_id", required=True),
+        bt.Phenotype: dict(obs="sex_ontology_term_id", required=False),
+        bt.Disease: dict(obs="disease_ontology_term_id", required=False),
+        bt.CellType: dict(obs="cell_type_ontology_term_id", required=False),
+        bt.DevelopmentalStage: dict(obs="development_stage_ontology_term_id", required=False),
+        bt.Tissue: dict(obs="tissue_ontology_term_id", required=False),
+        bt.ExperimentalFactor: dict(obs="assay_ontology_term_id", required=True),
+    }
+    for key, value in validators.items():
+        obs_key = value['obs']
+        required = value['required']
+        if obs_key not in adata.obs:
+            if required:
+                raise ValueError(f"Required column '{obs_key}' is missing in the provided anndata object.")
+            else:
+                print(f"Optional column '{obs_key}' is missing in the provided anndata object.")
+        elif not key.validate(adata.obs[obs_key], field="ontology_id").all():
+            if required:
+                raise ValueError(f"Invalid {key.__name__} ontology term id found")
+            else:
+                print(f"Invalid {key.__name__} optional ontology term id found")
+
     if not bt.Gene.validate(
         adata.var.index, field="ensembl_gene_id", organism=organism
     ).all():
