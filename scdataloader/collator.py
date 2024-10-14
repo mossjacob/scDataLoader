@@ -24,6 +24,7 @@ class Collator:
         genelist: list[str] = [],
         downsample: Optional[float] = None,  # don't use it for training!
         save_output: bool = False,
+        perturbation_data: bool = False,
     ):
         """
         This class is responsible for collating data for the scPRINT model. It handles the
@@ -80,6 +81,7 @@ class Collator:
         self.accepted_genes = {}
         self.downsample = downsample
         self.to_subset = {}
+        self.perturbation_data = perturbation_data
         self._setup(org_to_id, valid_genes, genelist)
 
     def _setup(self, org_to_id=None, valid_genes=[], genelist=[]):
@@ -121,11 +123,14 @@ class Collator:
         Returns:
             list[Tensor]: List of tensors containing the collated data.
         """
+        # TODO(jm) this can probably be optimised with vectorised operations
         # do count selection
         # get the unseen info and don't add any unseen
         # get the I most expressed genes, add randomly some unexpressed genes that are not unseen
         exprs = []
+        exprs_ctrl = []
         total_count = []
+        total_count_ctrl = []
         other_classes = []
         gene_locs = []
         tp = []
@@ -139,8 +144,13 @@ class Collator:
                 dataset.append(elem["_storage_idx"])
             expr = np.array(elem["X"])
             total_count.append(expr.sum())
+            if self.perturbation_data:
+                expr_ctrl = np.array(elem["X_ctrl"])
+                total_count_ctrl.append(expr_ctrl)
             if len(self.accepted_genes) > 0:
                 expr = expr[self.accepted_genes[organism_id]]
+                if self.perturbation_data:
+                    expr_ctrl = expr_ctrl[self.accepted_genes[organism_id]]
             if self.how == "most expr":
                 nnz_loc = np.where(expr > 0)[0]
                 ma = self.max_len if self.max_len < len(nnz_loc) else len(nnz_loc)
@@ -182,11 +192,16 @@ class Collator:
                 ]
                 loc = np.concatenate((loc, zero_loc), axis=None)
             expr = expr[loc]
+            if self.perturbation_data:
+                expr_ctrl = expr_ctrl[loc]
             loc = loc + self.start_idx[organism_id]
             if self.how == "some":
                 expr = expr[self.to_subset[organism_id]]
+                if self.perturbation_data:
+                    expr_ctrl = expr_ctrl[self.to_subset[organism_id]]
                 loc = loc[self.to_subset[organism_id]]
             exprs.append(expr)
+            exprs_ctrl.append(expr_ctrl)
             gene_locs.append(loc)
 
             if self.tp_name is not None:
@@ -197,17 +212,23 @@ class Collator:
             other_classes.append([elem[i] for i in self.class_names])
 
         expr = np.array(exprs)
+        expr_ctrl = np.array(expr_ctrl)
         tp = np.array(tp)
         gene_locs = np.array(gene_locs)
         total_count = np.array(total_count)
+        total_count_ctrl = np.array(total_count_ctrl)
         other_classes = np.array(other_classes)
         dataset = np.array(dataset)
 
         # normalize counts
         if self.norm_to is not None:
             expr = (expr * self.norm_to) / total_count[:, None]
+            if self.perturbation_data:
+                expr_ctrl = (expr_ctrl * self.norm_to) / total_count_ctrl[:, None]
         if self.logp1:
             expr = np.log2(1 + expr)
+            if self.perturbation_data:
+                expr_ctrl = np.log2(1 + expr_ctrl)
 
         # do binning of counts
         if self.n_bins:
@@ -229,6 +250,8 @@ class Collator:
             "tp": Tensor(tp),
             "depth": Tensor(total_count),
         }
+        if perturbation_data:
+            ret["x_ctrl"] = Tensor(expr_ctrl)
         if len(dataset) > 0:
             ret.update({"dataset": Tensor(dataset).to(long)})
         if self.downsample is not None:
