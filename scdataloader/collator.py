@@ -250,7 +250,7 @@ class Collator:
             "tp": Tensor(tp),
             "depth": Tensor(total_count),
         }
-        if perturbation_data:
+        if self.perturbation_data:
             ret["x_ctrl"] = Tensor(expr_ctrl)
         if len(dataset) > 0:
             ret.update({"dataset": Tensor(dataset).to(long)})
