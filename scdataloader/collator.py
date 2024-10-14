@@ -25,6 +25,7 @@ class Collator:
         downsample: Optional[float] = None,  # don't use it for training!
         save_output: bool = False,
         perturbation_data: bool = False,
+        subset_with_accepted_genes: bool = True,
     ):
         """
         This class is responsible for collating data for the scPRINT model. It handles the
@@ -82,6 +83,7 @@ class Collator:
         self.downsample = downsample
         self.to_subset = {}
         self.perturbation_data = perturbation_data
+        self.subset_with_accepted_genes = subset_with_accepted_genes
         self._setup(org_to_id, valid_genes, genelist)
 
     def _setup(self, org_to_id=None, valid_genes=[], genelist=[]):
@@ -136,6 +138,7 @@ class Collator:
         tp = []
         dataset = []
         nnz_loc = []
+        perturbed = []
         for elem in batch:
             organism_id = elem[self.organism_name]
             if organism_id not in self.organism_ids:
@@ -147,7 +150,7 @@ class Collator:
             if self.perturbation_data:
                 expr_ctrl = np.array(elem["X_ctrl"])
                 total_count_ctrl.append(expr_ctrl)
-            if len(self.accepted_genes) > 0:
+            if self.subset_with_accepted_genes and len(self.accepted_genes) > 0:
                 expr = expr[self.accepted_genes[organism_id]]
                 if self.perturbation_data:
                     expr_ctrl = expr_ctrl[self.accepted_genes[organism_id]]
@@ -192,6 +195,9 @@ class Collator:
                 ]
                 loc = np.concatenate((loc, zero_loc), axis=None)
             expr = expr[loc]
+            if "perturbed" in elem:
+                perturbed.append(elem['perturbed'][loc])
+
             if self.perturbation_data:
                 expr_ctrl = expr_ctrl[loc]
             loc = loc + self.start_idx[organism_id]
@@ -212,14 +218,14 @@ class Collator:
             other_classes.append([elem[i] for i in self.class_names])
 
         expr = np.array(exprs)
-        expr_ctrl = np.array(expr_ctrl)
+        expr_ctrl = np.array(exprs_ctrl)
         tp = np.array(tp)
         gene_locs = np.array(gene_locs)
         total_count = np.array(total_count)
         total_count_ctrl = np.array(total_count_ctrl)
         other_classes = np.array(other_classes)
         dataset = np.array(dataset)
-
+        perturbed = np.array(perturbed)
         # normalize counts
         if self.norm_to is not None:
             expr = (expr * self.norm_to) / total_count[:, None]
@@ -252,6 +258,7 @@ class Collator:
         }
         if self.perturbation_data:
             ret["x_ctrl"] = Tensor(expr_ctrl)
+            ret["perturbed"] = Tensor(perturbed)
         if len(dataset) > 0:
             ret.update({"dataset": Tensor(dataset).to(long)})
         if self.downsample is not None:
