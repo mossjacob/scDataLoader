@@ -139,7 +139,10 @@ class Collator:
         dataset = []
         nnz_loc = []
         perturbed = []
+        cell_indices = []
         for elem in batch:
+            if "cell_index" in elem:
+                cell_indices.append(elem["cell_index"])
             organism_id = elem[self.organism_name]
             if organism_id not in self.organism_ids:
                 continue
@@ -196,7 +199,7 @@ class Collator:
                 loc = np.concatenate((loc, zero_loc), axis=None)
             expr = expr[loc]
             if "perturbed" in elem:
-                perturbed.append(elem['perturbed'][loc])
+                pert = elem['perturbed'][loc]
 
             if self.perturbation_data:
                 expr_ctrl = expr_ctrl[loc]
@@ -204,12 +207,13 @@ class Collator:
             if self.how == "some":
                 expr = expr[self.to_subset[organism_id]]
                 if self.perturbation_data:
+                    pert = pert[self.to_subset[organism_id]]
                     expr_ctrl = expr_ctrl[self.to_subset[organism_id]]
                 loc = loc[self.to_subset[organism_id]]
             exprs.append(expr)
             exprs_ctrl.append(expr_ctrl)
             gene_locs.append(loc)
-
+            perturbed.append(pert)
             if self.tp_name is not None:
                 tp.append(elem[self.tp_name])
             else:
@@ -217,6 +221,7 @@ class Collator:
 
             other_classes.append([elem[i] for i in self.class_names])
 
+        cell_indices = np.array(cell_indices)
         expr = np.array(exprs)
         expr_ctrl = np.array(exprs_ctrl)
         tp = np.array(tp)
@@ -255,6 +260,7 @@ class Collator:
             "class": Tensor(other_classes).int(),
             "tp": Tensor(tp),
             "depth": Tensor(total_count),
+            "cell_indices": cell_indices,
         }
         if self.perturbation_data:
             ret["x_ctrl"] = Tensor(expr_ctrl)
