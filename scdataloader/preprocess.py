@@ -50,6 +50,8 @@ class Preprocessor:
         additional_preprocess: Optional[Callable[[AnnData], AnnData]] = None,
         additional_postprocess: Optional[Callable[[AnnData], AnnData]] = None,
         do_postp: bool = True,
+        do_unseen: bool = True,
+        do_qc: bool = True,
         organisms: list[str] = ["NCBITaxon:9606", "NCBITaxon:10090"],
         use_raw: bool = True,
     ) -> None:
@@ -116,6 +118,8 @@ class Preprocessor:
         self.use_layer = use_layer
         self.is_symbol = is_symbol
         self.do_postp = do_postp
+        self.do_unseen = do_unseen
+        self.do_qc = do_qc
         self.use_raw = use_raw
 
     def __call__(self, adata) -> AnnData:
@@ -228,17 +232,18 @@ class Preprocessor:
         if len(intersect_genes) < self.min_valid_genes_id:
             raise Exception("Dataset dropped due to too many genes not mapping to it")
         adata = adata[:, list(intersect_genes)]
-        # marking unseen genes
-        unseen = set(genesdf.index) - set(adata.var.index)
-        # adding them to adata
-        emptyda = ad.AnnData(
-            csr_matrix((adata.shape[0], len(unseen)), dtype=np.float32),
-            var=pd.DataFrame(index=list(unseen)),
-            obs=pd.DataFrame(index=adata.obs.index),
-        )
-        adata = ad.concat([adata, emptyda], axis=1, join="outer", merge="only")
-        # do a validation function
-        adata.uns["unseen_genes"] = list(unseen)
+        if self.do_unseen:
+            # marking unseen genes
+            unseen = set(genesdf.index) - set(adata.var.index)
+            # adding them to adata
+            emptyda = ad.AnnData(
+                csr_matrix((adata.shape[0], len(unseen)), dtype=np.float32),
+                var=pd.DataFrame(index=list(unseen)),
+                obs=pd.DataFrame(index=adata.obs.index),
+            )
+            adata = ad.concat([adata, emptyda], axis=1, join="outer", merge="only")
+            # do a validation function
+            adata.uns["unseen_genes"] = list(unseen)
         if not self.skip_validate:
             print("validating")
             data_utils.validate(adata, organism=adata.obs.organism_ontology_term_id[0])
@@ -267,30 +272,30 @@ class Preprocessor:
                 )
 
         # QC
-
-        adata.var[genesdf.columns] = genesdf.loc[adata.var.index]
-        print("startin QC")
-        sc.pp.calculate_qc_metrics(
-            adata, qc_vars=["mt", "ribo", "hb"], inplace=True, percent_top=[20]
-        )
-
-        adata.obs["outlier"] = (
-            data_utils.is_outlier(adata, "total_counts", self.madoutlier)
-            | data_utils.is_outlier(adata, "n_genes_by_counts", self.madoutlier)
-            | data_utils.is_outlier(
-                adata, "pct_counts_in_top_20_genes", self.madoutlier
+        if self.do_qc:
+            adata.var[genesdf.columns] = genesdf.loc[adata.var.index]
+            print("startin QC")
+            sc.pp.calculate_qc_metrics(
+                adata, qc_vars=["mt", "ribo", "hb"], inplace=True, percent_top=[20]
             )
-        )
 
-        adata.obs["mt_outlier"] = data_utils.is_outlier(adata, "pct_counts_mt", 3) | (
-            adata.obs["pct_counts_mt"] > self.pct_mt_outlier
-        )
-        total_outliers = (adata.obs["outlier"] | adata.obs["mt_outlier"]).sum()
-        total_cells = adata.shape[0]
-        percentage_outliers = (total_outliers / total_cells) * 100
-        print(
-            f"Seeing {total_outliers} outliers ({percentage_outliers:.2f}% of total dataset):"
-        )
+            adata.obs["outlier"] = (
+                data_utils.is_outlier(adata, "total_counts", self.madoutlier)
+                | data_utils.is_outlier(adata, "n_genes_by_counts", self.madoutlier)
+                | data_utils.is_outlier(
+                    adata, "pct_counts_in_top_20_genes", self.madoutlier
+                )
+            )
+
+            adata.obs["mt_outlier"] = data_utils.is_outlier(adata, "pct_counts_mt", 3) | (
+                adata.obs["pct_counts_mt"] > self.pct_mt_outlier
+            )
+            total_outliers = (adata.obs["outlier"] | adata.obs["mt_outlier"]).sum()
+            total_cells = adata.shape[0]
+            percentage_outliers = (total_outliers / total_cells) * 100
+            print(
+                f"Seeing {total_outliers} outliers ({percentage_outliers:.2f}% of total dataset):"
+            )
         # if percentage_outliers > 50:
         #    raise Exception("More than 50% of the dataset has been dropped due to outliers.")
         # adata = adata[(~adata.obs.outlier) & (~adata.obs.mt_outlier)].copy()
