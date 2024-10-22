@@ -107,8 +107,10 @@ class Collator:
             if len(valid_genes) > 0:
                 self.accepted_genes.update({org: ogenedf.index.isin(valid_genes)})
             if len(genelist) > 0:
-                df = ogenedf[ogenedf.index.isin(valid_genes)]
-                self.to_subset.update({org: df.index.isin(genelist)})
+                # df = ogenedf[ogenedf.index.isin(valid_genes)]
+                # self.to_subset.update({org: df.index.isin(genelist)})
+                # TODO(jm) was previously doing above ^
+                self.to_subset.update({org: valid_genes.isin(genelist)})
 
     def __call__(self, batch) -> dict[str, Tensor]:
         """
@@ -197,6 +199,12 @@ class Collator:
                     )
                 ]
                 loc = np.concatenate((loc, zero_loc), axis=None)
+
+            if "perturbed" in elem:
+                # Ensure that the perturbed gene is in the subset
+                already_selected_mask = np.zeros_like(elem["perturbed"])
+                already_selected_mask[loc] = True
+                loc = np.concatenate([loc, np.where(elem['perturbed'] & ~already_selected_mask)[0]])
             expr = expr[loc]
             if "perturbed" in elem:
                 pert = elem['perturbed'][loc]
