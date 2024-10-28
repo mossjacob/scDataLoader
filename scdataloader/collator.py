@@ -204,7 +204,13 @@ class Collator:
                 # Ensure that the perturbed gene is in the subset
                 already_selected_mask = np.zeros_like(elem["perturbed"])
                 already_selected_mask[loc] = True
-                loc = np.concatenate([loc, np.where(elem['perturbed'] & ~already_selected_mask)[0]])
+                perturbed_index = np.where(elem['perturbed'] & ~already_selected_mask)[0]
+                if perturbed_index.shape[0] == 0:
+                    # Perturbation is already in dataset, so add a random gene to make up the size
+                    # TODO(jm) make work for double knockouts
+                    perturbed_index = np.array([np.random.choice(np.where(~already_selected_mask.astype(bool))[0])])
+                loc = np.concatenate([loc, perturbed_index])
+
             expr = expr[loc]
             if "perturbed" in elem:
                 pert = elem['perturbed'][loc]
