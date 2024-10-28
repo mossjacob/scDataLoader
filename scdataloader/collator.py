@@ -208,7 +208,9 @@ class Collator:
                 if perturbed_index.shape[0] == 0:
                     # Perturbation is already in dataset, so add a random gene to make up the size
                     # TODO(jm) make work for double knockouts
-                    perturbed_index = np.array([np.random.choice(np.where(~already_selected_mask.astype(bool))[0])])
+                    random_choices = np.where(~already_selected_mask.astype(bool))[0]
+                    if random_choices.shape[0] > 0:
+                        perturbed_index = np.array([np.random.choice(random_choices)])
                 loc = np.concatenate([loc, perturbed_index])
 
             expr = expr[loc]
