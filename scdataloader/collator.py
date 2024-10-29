@@ -24,7 +24,7 @@ class Collator:
         genelist: list[str] = [],
         downsample: Optional[float] = None,  # don't use it for training!
         save_output: bool = False,
-        perturbation_data: int = 0
+        perturbation_data: int = 0,
         subset_with_accepted_genes: bool = True,
     ):
         """
