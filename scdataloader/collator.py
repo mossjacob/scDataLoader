@@ -152,12 +152,12 @@ class Collator:
                 dataset.append(elem["_storage_idx"])
             expr = np.array(elem["X"])
             total_count.append(expr.sum())
-            if self.perturbation_data:
+            if self.num_perturbations > 0:
                 expr_ctrl = np.array(elem["X_ctrl"])
                 total_count_ctrl.append(expr_ctrl)
             if self.subset_with_accepted_genes and len(self.accepted_genes) > 0:
                 expr = expr[self.accepted_genes[organism_id]]
-                if self.perturbation_data:
+                if self.num_perturbations > 0:
                     expr_ctrl = expr_ctrl[self.accepted_genes[organism_id]]
             if self.how == "most expr":
                 nnz_loc = np.where(expr > 0)[0]
@@ -221,12 +221,12 @@ class Collator:
             if "perturbed" in elem:
                 pert = elem['perturbed'][loc]
 
-            if self.perturbation_data:
+            if self.num_perturbations > 0:
                 expr_ctrl = expr_ctrl[loc]
             loc = loc + self.start_idx[organism_id]
             if self.how == "some":
                 expr = expr[self.to_subset[organism_id]]
-                if self.perturbation_data:
+                if self.num_perturbations > 0:
                     pert = pert[self.to_subset[organism_id]]
                     expr_ctrl = expr_ctrl[self.to_subset[organism_id]]
                 loc = loc[self.to_subset[organism_id]]
@@ -254,11 +254,11 @@ class Collator:
         # normalize counts
         if self.norm_to is not None:
             expr = (expr * self.norm_to) / total_count[:, None]
-            if self.perturbation_data:
+            if self.num_perturbations > 0:
                 expr_ctrl = (expr_ctrl * self.norm_to) / total_count_ctrl[:, None]
         if self.logp1:
             expr = np.log2(1 + expr)
-            if self.perturbation_data:
+            if self.num_perturbations > 0:
                 expr_ctrl = np.log2(1 + expr_ctrl)
 
         # do binning of counts
@@ -282,7 +282,7 @@ class Collator:
             "depth": Tensor(total_count),
             "cell_indices": cell_indices,
         }
-        if self.perturbation_data:
+        if self.num_perturbations > 0:
             ret["x_ctrl"] = Tensor(expr_ctrl)
             ret["perturbed"] = Tensor(perturbed)
         if len(dataset) > 0:
