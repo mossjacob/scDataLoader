@@ -24,7 +24,7 @@ class Collator:
         genelist: list[str] = [],
         downsample: Optional[float] = None,  # don't use it for training!
         save_output: bool = False,
-        perturbation_data: bool = False,
+        perturbation_data: int = 0
         subset_with_accepted_genes: bool = True,
     ):
         """
@@ -82,7 +82,7 @@ class Collator:
         self.accepted_genes = {}
         self.downsample = downsample
         self.to_subset = {}
-        self.perturbation_data = perturbation_data
+        self.num_perturbations = perturbation_data
         self.subset_with_accepted_genes = subset_with_accepted_genes
         self._setup(org_to_id, valid_genes, genelist)
 
@@ -205,16 +205,15 @@ class Collator:
                 already_selected_mask = np.zeros_like(elem["perturbed"])
                 already_selected_mask[loc] = True
                 perturbed_index = np.where(elem['perturbed'] & ~already_selected_mask)[0]
-                num_perts = elem['perturbed'].sum()
 
-                if num_perts - perturbed_index.shape[0] > 0:
+                if self.num_perturbations - perturbed_index.shape[0] > 0:
                     # Perturbation is already in dataset, so add a random gene to make up the size
                     # TODO(jm) make work for double knockouts
                     random_choices = np.where(~already_selected_mask.astype(bool))[0]
                     if random_choices.shape[0] > 0:
                         perturbed_index = np.concatenate([
                             perturbed_index,
-                            np.random.choice(random_choices, num_perts - perturbed_index.shape[0], replace=False)
+                            np.random.choice(random_choices, self.num_perturbations - perturbed_index.shape[0], replace=False)
                         ])
                 loc = np.concatenate([loc, perturbed_index])
 
